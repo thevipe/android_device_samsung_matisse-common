@@ -32,7 +32,7 @@ static pthread_once_t g_init = PTHREAD_ONCE_INIT;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
 char const*const PANEL_FILE = "/sys/class/leds/lcd-backlight/brightness";
-char const*const BUTTON_FILE = "/sys/class/sec/sec_touchkey/brightness";
+char const*const BUTTON_FILE = "/sys/class/leds/button-backlight/brightness";
 
 void init_g_lock(void)
 {
@@ -58,6 +58,46 @@ static int write_int(char const *path, int value)
     } else {
         if (already_warned == 0) {
             ALOGE("write_int failed to open %s\n", path);
+            already_warned = 1;
+        }
+        return -errno;
+    }
+}
+
+/* Currently unused.
+static int read_int(char const *path)
+{
+    int fd;
+    char buffer[2];
+
+    fd = open(path, O_RDONLY);
+
+    if (fd >= 0) {
+        read(fd, buffer, 1);
+    }
+    close(fd);
+
+    return atoi(buffer);
+}
+*/
+
+static int write_str(char const *path, const char* value)
+{
+    int fd;
+    static int already_warned;
+
+    already_warned = 0;
+
+    ALOGV("write_str: path %s, value %s", path, value);
+    fd = open(path, O_RDWR);
+
+    if (fd >= 0) {
+        int amt = write(fd, value, strlen(value));
+        close(fd);
+        return amt == -1 ? -errno : 0;
+    } else {
+        if (already_warned == 0) {
+            ALOGE("write_str failed to open %s\n", path);
             already_warned = 1;
         }
         return -errno;
@@ -114,12 +154,6 @@ static int close_lights(struct light_device_t *dev)
     return 0;
 }
 
-static int set_light_leds_noop(struct light_device_t *dev,
-            struct light_state_t const *state)
-{
-    return 0;
-}
-
 static int open_lights(const struct hw_module_t *module, char const *name,
                         struct hw_device_t **device)
 {
@@ -130,12 +164,6 @@ static int open_lights(const struct hw_module_t *module, char const *name,
         set_light = set_light_backlight;
     else if (0 == strcmp(LIGHT_ID_BUTTONS, name))
         set_light = set_light_buttons;
-    else if (0 == strcmp(LIGHT_ID_BATTERY, name))
-        set_light = set_light_leds_noop;
-    else if (0 == strcmp(LIGHT_ID_NOTIFICATIONS, name))
-        set_light = set_light_leds_noop;
-    else if (0 == strcmp(LIGHT_ID_ATTENTION, name))
-        set_light = set_light_leds_noop;
     else
         return -EINVAL;
 
@@ -164,7 +192,7 @@ struct hw_module_t HAL_MODULE_INFO_SYM = {
     .version_major = 1,
     .version_minor = 0,
     .id = LIGHTS_HARDWARE_MODULE_ID,
-    .name = "matissewifi Lights Module",
+    .name = "D2 Lights Module",
     .author = "The CyanogenMod Project",
     .methods = &lights_module_methods,
 };
